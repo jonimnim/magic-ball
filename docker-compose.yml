@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  magic-ball:
+    build: .
+    container_name: magic-ball
+    environment:
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+    volumes:
+      - ./.env:/app/.env:ro
+    command: node index.js
+    restart: unless-stopped
+
+  telegram-bot:
+    build: .
+    container_name: magic-ball-bot
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+    volumes:
+      - ./.env:/app/.env:ro
+    command: node telegram_bot.js
+    restart: unless-stopped
+    depends_on:
+      - magic-ball
+
