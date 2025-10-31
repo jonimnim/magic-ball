@@ -2,10 +2,30 @@
 
 ## Быстрый старт
 
+### 0. Настройка SSH ключа (если нужно)
+
+Если планируете клонировать через SSH, сначала настройте SSH ключ:
+```bash
+# Создание SSH ключа
+ssh-keygen -t ed25519 -C "prod-server"
+
+# Показать публичный ключ
+cat ~/.ssh/id_ed25519.pub
+```
+
+Скопируйте ключ и добавьте в GitHub: https://github.com/settings/keys
+
+Подробные инструкции в [SSH_SETUP.md](SSH_SETUP.md)
+
 ### 1. Клонирование репозитория
 
 ```bash
+# Через SSH (после настройки ключа)
+git clone git@github.com:jonimnim/magic-ball.git
+
+# Или через HTTPS
 git clone https://github.com/jonimnim/magic-ball.git
+
 cd magic-ball
 ```
 
