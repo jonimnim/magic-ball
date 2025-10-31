@@ -89,6 +89,31 @@ node index.js "Стоит ли мне начать этот проект?"
 - DeepSeek API
 - Docker
 
+## 🚀 Развертывание на продакшн сервере
+
+### Быстрый старт
+
+```bash
+# Клонирование репозитория
+git clone https://github.com/jonimnim/magic-ball.git
+cd magic-ball
+
+# Создание .env файла
+cat > .env << EOF
+DEEPSEEK_API_KEY=your_deepseek_api_key_here
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+EOF
+
+# Автоматическое развертывание
+chmod +x deploy.sh
+./deploy.sh
+
+# Или вручную
+docker-compose up -d telegram-bot
+```
+
+Подробные инструкции по развертыванию смотрите в [DEPLOY.md](DEPLOY.md)
+
 ## 📄 Лицензия
 
 ISC
