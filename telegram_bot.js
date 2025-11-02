@@ -13,6 +13,11 @@ if (!TELEGRAM_TOKEN || !DEEPSEEK_API_KEY) {
 
 const bot = new Telegraf(TELEGRAM_TOKEN);
 
+// Хранилище контекста для каждого пользователя
+// Структура: Map<userId, {history: Array, lastAnswer: string, lastQuestion: string}>
+const userContexts = new Map();
+const MAX_HISTORY_LENGTH = 20; // Максимальная длина истории диалога
+
 // Обработчики бота
 bot.start((ctx) => {
     ctx.reply(`🔮 *Привет! Я Магический Шар Судьбы* 
@@ -45,6 +50,7 @@ bot.help((ctx) => {
 // Обработка всех текстовых сообщений
 bot.on('text', async (ctx) => {
     const question = ctx.message.text;
+    const userId = ctx.from.id;
     
     // Игнорируем команды
     if (question.startsWith('/')) return;
@@ -53,8 +59,47 @@ bot.on('text', async (ctx) => {
         // Отправляем статус "печатает"
         await ctx.sendChatAction('typing');
         
-        // Получаем ответ от магического шара
-        const answer = await getMagicAnswer(question);
+        // Получаем или создаем контекст пользователя
+        if (!userContexts.has(userId)) {
+            userContexts.set(userId, {
+                history: [],
+                lastAnswer: null,
+                lastQuestion: null
+            });
+        }
+        
+        const userContext = userContexts.get(userId);
+        
+        // Получаем ответ от магического шара с учетом контекста
+        const answer = await getMagicAnswer(
+            question, 
+            null, 
+            userContext.history, 
+            userContext.lastAnswer,
+            userContext.lastQuestion
+        );
+        
+        // Обновляем контекст пользователя
+        // Добавляем вопрос в историю
+        userContext.history.push({
+            role: 'user',
+            content: question.trim()
+        });
+        
+        // Добавляем ответ в историю
+        userContext.history.push({
+            role: 'assistant',
+            content: answer
+        });
+        
+        // Ограничиваем длину истории
+        if (userContext.history.length > MAX_HISTORY_LENGTH) {
+            userContext.history = userContext.history.slice(-MAX_HISTORY_LENGTH);
+        }
+        
+        // Сохраняем последний вопрос и ответ
+        userContext.lastQuestion = question.trim();
+        userContext.lastAnswer = answer;
         
         // Форматируем ответ
         const formattedAnswer = `🔮 *Твой вопрос:* ${question}\n\n✨ *Ответ судьбы:* ${answer}`;
