@@ -6,7 +6,8 @@ WORKDIR /app
 COPY package*.json ./
 
 # Устанавливаем зависимости
-RUN npm ci --only=production
+# Используем npm ci если есть package-lock.json, иначе npm install
+RUN if [ -f package-lock.json ]; then npm ci --only=production; else npm install --only=production; fi
 
 # Копируем остальные файлы приложения
 COPY . .
