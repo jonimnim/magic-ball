@@ -14,7 +14,7 @@ if (!TELEGRAM_TOKEN || !DEEPSEEK_API_KEY) {
 const bot = new Telegraf(TELEGRAM_TOKEN);
 
 // Хранилище контекста для каждого пользователя
-// Структура: Map<userId, {history: Array, lastAnswer: string, lastQuestion: string}>
+// Структура: Map<userId, {history: Array, lastAnswer: string, lastQuestion: string, questionCounts: Map}>
 const userContexts = new Map();
 const MAX_HISTORY_LENGTH = 20; // Максимальная длина истории диалога
 
@@ -64,19 +64,27 @@ bot.on('text', async (ctx) => {
             userContexts.set(userId, {
                 history: [],
                 lastAnswer: null,
-                lastQuestion: null
+                lastQuestion: null,
+                questionCounts: new Map() // Счетчик повторений для каждого вопроса
             });
         }
         
         const userContext = userContexts.get(userId);
+        const normalizedQuestion = question.trim().toLowerCase();
         
-        // Получаем ответ от магического шара с учетом контекста
+        // Подсчитываем количество повторений текущего вопроса
+        const questionCount = userContext.questionCounts.get(normalizedQuestion) || 0;
+        const newQuestionCount = questionCount + 1;
+        userContext.questionCounts.set(normalizedQuestion, newQuestionCount);
+        
+        // Получаем ответ от магического шара с учетом контекста и количества повторений
         const answer = await getMagicAnswer(
             question, 
             null, 
             userContext.history, 
             userContext.lastAnswer,
-            userContext.lastQuestion
+            userContext.lastQuestion,
+            newQuestionCount
         );
         
         // Обновляем контекст пользователя

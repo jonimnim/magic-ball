@@ -8,10 +8,90 @@ const MAX_TOKENS = 10;
 const TEMPERATURE = 0.9;
 const MAX_RETRIES = 3; // Максимальное количество попыток при дубликате ответа
 
-const SYSTEM_PROMPT = `Ты - магический шар желаний. Отвечай ТОЛЬКО одним словом или максимум тремя словами на русском. 
-Доступные варианты: да, нет, возможно, шанс есть, маловероятно, время покажет, дерзай, подожди, спроси позже, 
-абсолютно точно, нет шансов, верь в себя, знаки хороши, не сейчас, рискни, осторожнее, да судьба, не время.
+const BASE_SYSTEM_PROMPT = `Ты - магический шар желаний. Отвечай ТОЛЬКО одним словом или максимум тремя словами на русском. 
 Будь краток и загадочно. НИКАКИХ объяснений!`;
+
+/**
+ * Проверяет, является ли ответ отрицательным
+ * @param {string} answer - Ответ для проверки
+ * @returns {boolean} - true если ответ отрицательный
+ */
+function isNegativeAnswer(answer) {
+    if (!answer) return false;
+    const normalized = answer.toLowerCase().trim();
+    
+    // Список отрицательных слов/фраз
+    const negativePatterns = [
+        'нет',
+        'не стоит',
+        'маловероятно',
+        'нет шансов',
+        'не сейчас',
+        'не время',
+        'осторожнее',
+        'не спеши',
+        'подожди',
+        'однозначно нет',
+        'нельзя',
+        'не надо',
+        'не нужно'
+    ];
+    
+    return negativePatterns.some(pattern => normalized.includes(pattern));
+}
+
+/**
+ * Генерирует системный промпт в зависимости от количества повторений вопроса и предыдущего ответа
+ * @param {number} repeatCount - Количество повторений вопроса
+ * @param {string} lastAnswer - Последний ответ на этот вопрос
+ * @returns {string} - Системный промпт
+ */
+function getSystemPromptForRepeat(repeatCount, lastAnswer = null) {
+    const wasNegative = lastAnswer && isNegativeAnswer(lastAnswer);
+    
+    if (repeatCount === 1) {
+        // Первый раз - нейтральный ответ (любой вариант)
+        return `${BASE_SYSTEM_PROMPT}
+Доступные варианты: да, нет, стоит, не стоит, возможно, шанс есть, маловероятно, верь в себя, абсолютно точно, знаки хороши, да судьба, время покажет.`;
+    } else if (repeatCount === 2) {
+        // Второй раз
+        if (wasNegative) {
+            // Если первый ответ был отрицательным - сразу негативный
+            return `${BASE_SYSTEM_PROMPT}
+Доступные варианты: однозначно нет, нет шансов, маловероятно, не стоит, осторожнее, не сейчас, не время, не стоит.`;
+        } else {
+            // Если был позитивным - энергичный
+            return `${BASE_SYSTEM_PROMPT}
+Доступные варианты: дерзай, рискни, время действовать, смелее, вперед, не медли.`;
+        }
+    } else if (repeatCount === 3) {
+        // Третий раз
+        if (wasNegative) {
+            // Если первый был отрицательным - критичный
+            return `${BASE_SYSTEM_PROMPT}
+Доступные варианты: нет, ты сам не определился, решай сам, хватит спрашивать, подумай сам, не знаю, решай.`;
+        } else {
+            // Если был позитивным - сомневающийся
+            return `${BASE_SYSTEM_PROMPT}
+Доступные варианты: может повременить, может подумаешь, время покажет, не спеши, подожди, спроси позже, может не сейчас.`;
+        }
+    } else if (repeatCount === 4) {
+        // Четвертый раз
+        if (wasNegative) {
+            // Если первый был отрицательным - максимально критичный
+            return `${BASE_SYSTEM_PROMPT}
+Доступные варианты: нет, ты сам не определился, решай сам, хватит спрашивать, подумай сам, не знаю, решай, перестань спрашивать.`;
+        } else {
+            // Если был позитивным - негативный
+            return `${BASE_SYSTEM_PROMPT}
+Доступные варианты: однозначно нет, нет шансов, маловероятно, не стоит, осторожнее, не сейчас, не время.`;
+        }
+    } else {
+        // Пятый раз и более - всегда критичный
+        return `${BASE_SYSTEM_PROMPT}
+Доступные варианты: нет, ты сам не определился, решай сам, хватит спрашивать, подумай сам, не знаю, решай, перестань спрашивать.`;
+    }
+}
 
 /**
  * Проверяет, является ли ответ дубликатом последнего ответа
@@ -78,9 +158,10 @@ function isSameQuestion(question, lastQuestion) {
  * @param {Array} [history] - История диалога в формате [{role: 'user', content: '...'}, {role: 'assistant', content: '...'}]
  * @param {string} [lastAnswer] - Последний ответ для проверки дубликатов
  * @param {string} [lastQuestion] - Последний вопрос для проверки дубликатов
+ * @param {number} [repeatCount=1] - Количество повторений вопроса
  * @returns {Promise<string>} - Ответ магического шара
  */
-async function getMagicAnswer(question, apiKey = null, history = [], lastAnswer = null, lastQuestion = null) {
+async function getMagicAnswer(question, apiKey = null, history = [], lastAnswer = null, lastQuestion = null, repeatCount = 1) {
     const key = apiKey || process.env.DEEPSEEK_API_KEY;
     
     if (!key) {
@@ -96,11 +177,15 @@ async function getMagicAnswer(question, apiKey = null, history = [], lastAnswer 
     // Проверяем, является ли это тем же вопросом
     const sameQuestion = isSameQuestion(trimmedQuestion, lastQuestion);
 
+    // Генерируем системный промпт в зависимости от количества повторений и предыдущего ответа
+    // Для того же вопроса используем lastAnswer, для нового - null
+    const systemPrompt = getSystemPromptForRepeat(repeatCount, sameQuestion ? lastAnswer : null);
+
     // Формируем массив сообщений для API
     const messages = [
         {
             role: 'system',
-            content: SYSTEM_PROMPT
+            content: systemPrompt
         },
         // Добавляем историю диалога (ограничиваем последние 10 сообщений для экономии токенов)
         ...history.slice(-10),
